@@ -1,2 +1,2 @@
 grblHAL driver for Gigadevice GD32F30x
-Compile with PlatformIO
+Build with VS Code & PlatformIO
