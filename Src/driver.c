@@ -1305,7 +1305,7 @@ static char *port2char (GPIO_TypeDef *port)
 {
     static char name[3] = "P?";
 
-    name[1] = 'A' + GPIO_GET_INDEX(port); //need to check for gd32
+    name[1] = 'A' + GPIO_GET_INDEX(port);
 
     return name;
 }

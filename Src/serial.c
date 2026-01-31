@@ -128,8 +128,7 @@ static bool serialPutC (const char c)
 
     txbuf.data[txbuf.head] = c;                         // Add data to buffer,
     txbuf.head = next_head;                             // update head pointer and
-//    USART->CR1 |= USART_CR1_TXEIE;                      // enable TX interrupts
-    usart_interrupt_enable(USART,USART_INT_TBE);
+    usart_interrupt_enable(USART,USART_INT_TBE);        // enable TX interrupts
     return true;
 }
 
@@ -139,36 +138,20 @@ static bool serialPutC (const char c)
 static void serialWriteS (const char *s)
 {
     char c, *ptr = (char *)s;
-
     while((c = *ptr++) != '\0')
         serialPutC(c);
 }
 
-//
-// Writes a number of characters from string to the serial output stream followed by EOL, blocks if buffer full
-//
-/*
-static void serialWrite(const char *s, uint16_t length)
-{
-    char *ptr = (char *)s;
-
-    while(length--)
-        serialPutC(*ptr++);
-}
-*/
 //
 // serialGetC - returns -1 if no data available
 //
 static int16_t serialGetC (void)
 {
     uint_fast16_t tail = rxbuf.tail;    // Get buffer pointer
-
     if(tail == rxbuf.head)
         return -1; // no data available
-
     char data = rxbuf.data[tail];       // Get next character
     rxbuf.tail = BUFNEXT(tail, rxbuf);  // and update pointer
-
     return (int16_t)data;
 }
 
@@ -215,8 +198,7 @@ const io_stream_t *serialInit (uint32_t baud_rate)
 
     /* RCU Config*/
     rcu_periph_clock_enable(RCU_GPIO);
-//    rcu_usart_clock_config (CK_APB2); // Select the clock source of the USART0 peripheral
-    rcu_periph_clock_enable (RCU_UART); // Make usart0 peripheral clock
+    rcu_periph_clock_enable (RCU_UART); // Make usart0 peripheral clock on
 
     /* connect port to USARTx_Tx and USARTx_Rx  */
     gpio_init(UART_TX_RX_GPIO, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, UART_TX_GPIO_PIN);
@@ -233,10 +215,8 @@ const io_stream_t *serialInit (uint32_t baud_rate)
     usart_receive_config(USART, USART_RECEIVE_ENABLE);
     usart_transmit_config(USART, USART_TRANSMIT_ENABLE);
     usart_enable(USART);
-
     nvic_irq_enable(USART_IRQn, 1, 0);
     usart_interrupt_enable(USART, USART_INT_RBNE);
-
     return &stream;
 }
 
@@ -256,11 +236,10 @@ void USART_IRQHandler (void)
     }
 
     if((RESET != usart_interrupt_flag_get(USART, USART_INT_FLAG_TBE)) && (RESET !=usart_flag_get(USART, USART_FLAG_TBE)))  {
-        uint_fast16_t tail = txbuf.tail;                // Get buffer pointer
-        usart_data_transmit(USART, txbuf.data[tail]);   // Send next character
-        txbuf.tail = tail = BUFNEXT(tail, txbuf);       // and increment pointer
-        if(tail == txbuf.head)                          // If buffer empty then
-            // USART->CR1 &= ~USART_CR1_TXEIE;          // disable UART TX interrupt
-            usart_interrupt_disable(USART,USART_INT_TBE);
+        uint_fast16_t tail = txbuf.tail;                    // Get buffer pointer
+        usart_data_transmit(USART, txbuf.data[tail]);       // Send next character
+        txbuf.tail = tail = BUFNEXT(tail, txbuf);           // and increment pointer
+        if(tail == txbuf.head)                              // If buffer empty then
+            usart_interrupt_disable(USART,USART_INT_TBE);   // disable UART TX interrupt
    }
 }

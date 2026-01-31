@@ -49,7 +49,6 @@ bool memcpy_to_flash (uint8_t *source)
     fmc_flag_clear(FMC_FLAG_BANK0_END | FMC_FLAG_BANK0_WPERR | FMC_FLAG_BANK0_PGERR);
 
     uint16_t *data = (uint16_t *)source;
-    //uint32_t *data = (uint32_t *)source;
     uint32_t address = FLASH_TARGET, remaining = (uint32_t)hal.nvs.size;
     fmc_state_enum status = FMC_READY;
 
@@ -59,14 +58,6 @@ bool memcpy_to_flash (uint8_t *source)
         address += 4;
         remaining -= 4;
     }
-/*
-    while(address < (FLASH_TARGET+hal.nvs.size)){
-        status = fmc_word_program(address, *data);
-        address += 4U;
-        data += 4U; 
-        fmc_flag_clear(FMC_FLAG_BANK0_END | FMC_FLAG_BANK0_WPERR | FMC_FLAG_BANK0_PGERR);
-    }
-*/
     fmc_lock();
 
     return (status == FMC_READY);
