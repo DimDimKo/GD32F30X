@@ -41,38 +41,6 @@
 #include "nuts_bolts.h"
 #include "driver_opts.h"
 
-
-//typedef struct
-//{
-//  __IO uint32_t MODER;        /*!< GPIO port mode register,               Address offset: 0x00      */
-//  __IO uint32_t OTYPER;       /*!< GPIO port output type register,        Address offset: 0x04      */
-//  __IO uint32_t OSPEEDR;      /*!< GPIO port output speed register,       Address offset: 0x08      */
-//  __IO uint32_t PUPDR;        /*!< GPIO port pull-up/pull-down register,  Address offset: 0x0C      */
-//  __IO uint32_t IDR;          /*!< GPIO port input data register,         Address offset: 0x10      */
-//  __IO uint32_t ODR;          /*!< GPIO port output data register,        Address offset: 0x14      */
-//  __IO uint32_t BSRR;         /*!< GPIO port bit set/reset register,      Address offset: 0x1A */
-//  __IO uint32_t LCKR;         /*!< GPIO port configuration lock register, Address offset: 0x1C      */
-//  __IO uint32_t AFR[2];       /*!< GPIO alternate function registers,     Address offset: 0x20-0x24 */
-//  __IO uint32_t BRR;          /*!< GPIO bit reset register,               Address offset: 0x28 */
-//}GPIO_TypeDef;
-
-// GD32 gpio
-//typedef struct
-//{
-//  __IO uint32_t CTL0;       /* Port control register 0 (GPIOx_CTL0, x=A..G)          Address offset: 0x00      */
-//  __IO uint32_t CTL1;       /* Port control register 1 (GPIOx_CTL1, x=A..G)          Address offset: 0x04      */
-//  __IO uint32_t ISTAT;      /* Port input status register (GPIOx_ISTAT, x=A..G       Address offset: 0x08      */
-//  __IO uint32_t OCTL;       /* Port output control register (GPIOx_OCTL, x=A..G)     Address offset: 0x0C      */
-//  __IO uint32_t BOP;        /* Port bit operate register (GPIOx_BOP, x=A..G)         Address offset: 0x10      */
-//  __IO uint32_t BC;         /* Port bit clear register (GPIOx_BC, x=A..G)            Address offset: 0x14      */
-//  __IO uint32_t LOCK;       /* Port configuration lock register (GPIOx_LOCK, x=A..G) Address offset: 0x18      */
-//  __IO uint32_t RSV[8];     /* Reserved Address offset: 0x1C-0x38                                              */
-//  __IO uint32_t SPD;        /* Port bit speed register (GPIOx_ SPD, x=A..G)          Address offset: 0x3C      */
-//} GPIO_TypeDef;
-
-
-//#define DIGITAL_IN(port, bit) !!(port->IDR & bit)
-//#define DIGITAL_OUT(port, bit, on) { if(on) port->BSRR = bit; else port->BRR = bit; }
 #define DIGITAL_IN(gpio_periph, pin) !!(GPIO_ISTAT(gpio_periph)&(pin))
 #define DIGITAL_OUT(gpio_periph, pin, on) { if(on) GPIO_BOP(gpio_periph) = (uint32_t)pin; else GPIO_BC(gpio_periph) = (uint32_t)pin; }
 
@@ -117,12 +85,8 @@
 #define CONTROL_ENABLE (CONTROL_HALT|CONTROL_FEED_HOLD|CONTROL_CYCLE_START)
 #endif
 
-#ifdef BOARD_CNC_BOOSTERPACK
-#include "boards/cnc_boosterpack_map.h"
-#elif defined(BOARD_CNC3040)
-#include "boards/cnc3040_map.h"
-#elif defined(BOARD_MY_MACHINE)
-#include "boards/my_machine_map.h"
+#ifdef BOARD_LUNYEE3AXIS
+#include "../boards/lunyee3axis.h"
 #else // default board
 #include "../boards/generic_map.h"
 #endif
