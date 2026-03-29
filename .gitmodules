@@ -10,3 +10,6 @@
 [submodule "plugins"]
 	path = plugins
 	url = https://github.com/grblHAL/Plugins_misc/
+[submodule "core"]
+	path = core
+	url = https://github.com/grblhal/core
