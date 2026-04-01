@@ -482,7 +482,18 @@ static control_signals_t systemGetState (void)
     return aux_ctrl_scan_status(signals);
 }
 
+
 #if DRIVER_PROBES
+
+// Returns the probe triggered pin state.
+static bool probeGetState (void * input)
+{
+    return DIGITAL_IN(((input_signal_t *)input)->port, ((input_signal_t *)input)->bit);
+}
+
+#endif // DRIVER_PROBES
+
+#if 0&&DRIVER_PROBES
 
 static probe_state_t probe_state = { .connected = On };
 static probe_t probes[DRIVER_PROBES], *probe = &probes[0];
@@ -597,45 +608,13 @@ static bool probe_add (probe_id_t probe_id, uint8_t port, pin_irq_mode_t irq_mod
 
 #endif // DRIVER_PROBES
 
-#if 0
-
-// Returns the probe connected and triggered pin states.
-static probe_state_t probeGetState (void)
-{
-    probe_state_t state = {0};
-
-    state.connected = probe.connected;
-    state.triggered = !!(PROBE_PORT->IDR & PROBE_BIT) ^ probe.inverted;
-
-    return state;
-}
-
-#endif
-
 static void aux_irq_handler (uint8_t port, bool state)
 {
-    aux_ctrl_t *pin;
+    aux_ctrl_t *aux_in;
     control_signals_t signals = {};
 
-    if((pin = aux_ctrl_get_pin(port))) {
-        switch(pin->function) {
-#if DRIVER_PROBES
-  #if PROBE_ENABLE
-            case Input_Probe:
-  #endif
-  #if PROBE2_ENABLE
-            case Input_Probe2:
-  #endif
-  #if TOOLSETTER_ENABLE
-            case Input_Toolsetter:
-  #endif
-                if(probe_state.is_probing) {
-                    probe_state.triggered = On;
-                    return;
-                } else
-                    signals.probe_triggered = On;
-                break;
-#endif
+    if((aux_in = aux_ctrl_in_get(port))) {
+        switch(aux_in->function) {
 #ifdef I2C_STROBE_PIN
             case Input_I2CStrobe:
                 if(i2c_strobe.callback)
@@ -650,9 +629,9 @@ static void aux_irq_handler (uint8_t port, bool state)
             default:
                 break;
         }
-        signals.mask |= pin->cap.mask;
-        if(!signals.probe_triggered && pin->irq_mode == IRQ_Mode_Change)
-            signals.deasserted = hal.port.wait_on_input(Port_Digital, pin->aux_port, WaitMode_Immediate, 0.0f) == 0;
+        signals.mask |= aux_in->signal.mask;
+        if(!signals.probe_triggered && aux_in->irq_mode == IRQ_Mode_Change)
+            signals.deasserted = hal.port.wait_on_input(Port_Digital, aux_in->port, WaitMode_Immediate, 0.0f) == 0;
     }
 
     if(signals.mask) {
@@ -664,59 +643,56 @@ static void aux_irq_handler (uint8_t port, bool state)
 
 static bool aux_claim_explicit (aux_ctrl_t *aux_ctrl)
 {
-    xbar_t *pin;
-
-    if(aux_ctrl->input == NULL) {
-
-        uint_fast8_t i = sizeof(inputpin) / sizeof(input_signal_t);
-
-        do {
-            --i;
-            if(inputpin[i].group == PinGroup_AuxInput && inputpin[i].user_port == aux_ctrl->aux_port)
-                aux_ctrl->input = &inputpin[i];
-        } while(i && aux_ctrl->input == NULL);
-    }
-
-    if(aux_ctrl->input && (pin = ioport_claim(Port_Digital, Port_Input, &aux_ctrl->aux_port, NULL))) {
-
-        ioport_set_function(pin, aux_ctrl->function, &aux_ctrl->cap);
-
-        switch(aux_ctrl->function) {
-#if PROBE_ENABLE
-            case Input_Probe:
-                hal.driver_cap.probe = probe_add(Probe_Default, aux_ctrl->aux_port, pin->cap.irq_mode, aux_ctrl->input);
-                break;
-#endif
-#if PROBE2_ENABLE
-            case Input_Probe2:
-                hal.driver_cap.probe2 = probe_add(Probe_2, aux_ctrl->aux_port, pin->cap.irq_mode, aux_ctrl->input);
-                break;
-
-#endif
-#if TOOLSETTER_ENABLE
-            case Input_Toolsetter:
-                hal.driver_cap.toolsetter = probe_add(Probe_Toolsetter, aux_ctrl->aux_port, pin->cap.irq_mode, aux_ctrl->input);
-                break;
-#endif
-#if SAFETY_DOOR_ENABLE || defined(QEI_SELECT_PIN) || (defined(RESET_PIN) && !ESTOP_ENABLE)
-  #if defined(RESET_PIN) && !ESTOP_ENABLE
-            case Input_Reset:
-  #endif
-  #if SAFETY_DOOR_ENABLE
-            case Input_SafetyDoor:
-  #endif
-  #ifdef QEI_SELECT_PIN
-            case Input_QEI_Select:
-  #endif
-                ((input_signal_t *)aux_ctrl->input)->mode.debounce = ((input_signal_t *)aux_ctrl->input)->cap.debounce && hal.driver_cap.software_debounce;
-                break;
-#endif
-            default: break;
+        xbar_t *pin;
+    
+        if(aux_ctrl->input == NULL) {
+    
+            uint_fast8_t i = sizeof(inputpin) / sizeof(input_signal_t);
+    
+            do {
+                --i;
+                if(inputpin[i].group == PinGroup_AuxInput && inputpin[i].user_port == aux_ctrl->port)
+                    aux_ctrl->input = &inputpin[i];
+            } while(i && aux_ctrl->input == NULL);
         }
-    } else
-        aux_ctrl->aux_port = 0xFF;
-
-    return aux_ctrl->aux_port != 0xFF;
+    
+        if((pin = aux_ctrl_claim_port(aux_ctrl))) {
+    
+            switch(aux_ctrl->function) {
+    #if PROBE_ENABLE
+                case Input_Probe:
+                    hal.driver_cap.probe = probe_add(Probe_Default, aux_ctrl->port, pin->cap.irq_mode, aux_ctrl->input, probeGetState);
+                    break;
+    #endif
+    #if PROBE2_ENABLE
+                case Input_Probe2:
+                    hal.driver_cap.probe2 = probe_add(Probe_2, aux_ctrl->port, pin->cap.irq_mode, aux_ctrl->input, probeGetState);
+                    break;
+    
+    #endif
+    #if TOOLSETTER_ENABLE
+                case Input_Toolsetter:
+                    hal.driver_cap.toolsetter = probe_add(Probe_Toolsetter, aux_ctrl->port, pin->cap.irq_mode, aux_ctrl->input, probeGetState);
+                    break;
+    #endif
+    #if SAFETY_DOOR_ENABLE || defined(QEI_SELECT_PIN) || (defined(RESET_PIN) && !ESTOP_ENABLE)
+      #if defined(RESET_PIN) && !ESTOP_ENABLE
+                case Input_Reset:
+      #endif
+      #if SAFETY_DOOR_ENABLE
+                case Input_SafetyDoor:
+      #endif
+      #ifdef QEI_SELECT_PIN
+                case Input_QEI_Select:
+      #endif
+                    ((input_signal_t *)aux_ctrl->input)->mode.debounce = ((input_signal_t *)aux_ctrl->input)->cap.debounce && hal.driver_cap.software_debounce;
+                    break;
+    #endif
+                default: break;
+            }
+        }
+    
+        return aux_ctrl->port != IOPORT_UNASSIGNED;
 }
 
 static void aux_assign_irq (void)
@@ -744,13 +720,17 @@ static void aux_assign_irq (void)
             input->mode.pull_mode = PullMode_Up;
             input->cap.pull_mode = PullMode_UpDown;
             input->cap.irq_mode = (DRIVER_IRQMASK & input->bit) ? IRQ_Mode_None : IRQ_Mode_Edges;
-            aux = aux_ctrl_get_fn(input->port, input->pin);
+
+            aux = aux_ctrl_get_fn((aux_gpio_t){ .port = input->port, .pin = input->pin });
+
             if(input->cap.irq_mode == IRQ_Mode_None) {
-                if(aux && aux_ctrl_is_probe(aux->function))
+                if(aux && xbar_is_probe_in(aux->function))
                     input->id = aux->function;
             } else {
+
                 if(aux)
                     input->id = aux->function;
+
                 if(irq & input->bit) { // duplicate IRQ
 
                     if(aux == NULL)
@@ -758,13 +738,13 @@ static void aux_assign_irq (void)
                     else for(j = 0; j < aux_digital_in.n_pins - 1; j++) {
                         input2 = &aux_digital_in.pins.inputs[j];
                         if(input->pin == input2->pin) {
-                            if(input->id < input2->id || (aux->cap.bits & main_signals.bits)) {
+                            if(input->id < input2->id || (aux->signal.bits & main_signals.bits)) {
                                 input2->cap.irq_mode = IRQ_Mode_None;
-                                if(!aux_ctrl_is_probe(input2->id))
+                                if(!xbar_is_probe_in(input2->id))
                                     input2->id = (pin_function_t)(Input_Aux0 + input2->user_port);
                             } else {
                                 input->cap.irq_mode = IRQ_Mode_None;
-                                if(!aux_ctrl_is_probe(input->id))
+                                if(!xbar_is_probe_in(input->id))
                                     input->id = (pin_function_t)(Input_Aux0 + input->user_port);
                             }
                         }
@@ -776,6 +756,7 @@ static void aux_assign_irq (void)
     }
 }
 
+#if 0
 bool aux_out_claim_explicit (aux_ctrl_out_t *aux_ctrl)
 {
     xbar_t *pin;
@@ -787,6 +768,7 @@ bool aux_out_claim_explicit (aux_ctrl_out_t *aux_ctrl)
 
     return aux_ctrl->aux_port != 0xFF;
 }
+#endif
 
 #if DRIVER_SPINDLE_ENABLE
 
@@ -861,12 +843,9 @@ static void spindleSetState (spindle_ptrs_t *spindle, spindle_state_t state, flo
 static void pwm_off (spindle_ptrs_t *spindle)
 {
     if(spindle->context.pwm->flags.always_on) {
-        //SPINDLE_PWM_TIMER->CCR1 = spindle->context.pwm->off_value;
         TIMER_CH0CV(SPINDLE_PWM_TIMER) = spindle->context.pwm->off_value;
-        //SPINDLE_PWM_TIMER->BDTR |= TIM_BDTR_MOE;
         TIMER_CCHP(SPINDLE_PWM_TIMER) |= TIMER_CCHP_POEN;
     } else
-    //SPINDLE_PWM_TIMER->BDTR &= ~TIM_BDTR_MOE; 
     TIMER_CCHP(SPINDLE_PWM_TIMER) &= ~TIMER_CCHP_POEN; // Set PWM output low
 }
 
@@ -874,11 +853,9 @@ static void pwm_off (spindle_ptrs_t *spindle)
 static void spindleSetSpeed (spindle_ptrs_t *spindle, uint_fast16_t pwm_value)
 {
     if(pwm_value == spindle->context.pwm->off_value) {
-
         if(spindle->context.pwm->flags.rpm_controlled) {
             spindle_off(spindle);
             if(spindle->context.pwm->flags.laser_off_overdrive)
-                //SPINDLE_PWM_TIMER->CCR1 = spindle->context.pwm->pwm_overdrive;
                 TIMER_CH0CV(SPINDLE_PWM_TIMER) = spindle->context.pwm->pwm_overdrive;
         } else
             pwm_off(spindle);
@@ -887,9 +864,7 @@ static void spindleSetSpeed (spindle_ptrs_t *spindle, uint_fast16_t pwm_value)
 
         if(!spindle->context.pwm->flags.enable_out && spindle->context.pwm->flags.rpm_controlled)
             spindle_on(spindle);
-        //SPINDLE_PWM_TIMER->CCR1 = pwm_value;
         TIMER_CH0CV(SPINDLE_PWM_TIMER) = pwm_value;
-        //SPINDLE_PWM_TIMER->BDTR |= TIM_BDTR_MOE;
         TIMER_CCHP(SPINDLE_PWM_TIMER) |= TIMER_CCHP_POEN;
     }
 }
@@ -943,32 +918,18 @@ bool spindleConfig (spindle_ptrs_t *spindle)
 
     if((spindle_precompute_pwm_values(spindle, &spindle_pwm, &settings.pwm_spindle, SystemCoreClock / prescaler))) {
         spindle->set_state = spindleSetStateVariable;
-        //SPINDLE_PWM_TIMER->CR1 &= ~TIM_CR1_CEN;
         TIMER_CTL0(SPINDLE_PWM_TIMER) &= ~TIMER_CTL0_CEN;
-        //TIM_Base_InitTypeDef timerInitStructure = {
-            //.Prescaler = prescaler - 1,
             TIMER_PSC(SPINDLE_PWM_TIMER) = prescaler - 1;
-            //.CounterMode = TIM_COUNTERMODE_UP,
             TIMER_CTL0(SPINDLE_PWM_TIMER) &= ~TIMER_CTL0_DIR;
-            //.Period = spindle_pwm.period - 1,
             TIMER_CAR(SPINDLE_PWM_TIMER) = spindle_pwm.period - 1;
-            //.ClockDivision = TIM_CLOCKDIVISION_DIV1,
             TIMER_CTL0(SPINDLE_PWM_TIMER) &= ~TIMER_CTL0_CKDIV;
             TIMER_CTL0(SPINDLE_PWM_TIMER) |= TIMER_CKDIV_DIV1;
-            //.RepetitionCounter = 0
             TIMER_CREP(SPINDLE_PWM_TIMER) = 0;
-        //};
-        //TIM_Base_SetConfig(SPINDLE_PWM_TIMER, &timerInitStructure);
         TIMER_SWEVG(SPINDLE_PWM_TIMER) = TIMER_SWEVG_UPG;
-        //SPINDLE_PWM_TIMER->CCER &= ~TIM_CCER_CC1E;
         TIMER_CHCTL2(SPINDLE_PWM_TIMER) &= ~TIMER_CHCTL2_CH0EN; // Disable ch0 capture/compare 
-        //SPINDLE_PWM_TIMER->CCMR1 &= ~(TIM_CCMR1_OC1M|TIM_CCMR1_CC1S);
         TIMER_CHCTL0(SPINDLE_PWM_TIMER) &= ~(0x00010070UL|0x3UL);
-        //SPINDLE_PWM_TIMER->CCMR1 |= TIM_CCMR1_OC1M_1|TIM_CCMR1_OC1M_2;
         TIMER_CHCTL0(SPINDLE_PWM_TIMER) |= BIT(5)|BIT(6); // PWM mode
-        //SPINDLE_PWM_TIMER->CCR1 = 0;
         TIMER_CH0CV(SPINDLE_PWM_TIMER) = 0;
-        //SPINDLE_PWM_TIMER->BDTR |= TIM_BDTR_OSSR|TIM_BDTR_OSSI;
         TIMER_CCHP(SPINDLE_PWM_TIMER) |= TIMER_CCHP_ROS|TIMER_CCHP_IOS;
 /*
 #if SPINDLE_PWM_PIN == 7
@@ -983,22 +944,15 @@ bool spindleConfig (spindle_ptrs_t *spindle)
 #else
 */
         if(spindle_pwm.flags.invert_pwm) {
-            //SPINDLE_PWM_TIMER->CCER |= TIM_CCER_CC1P;
             TIMER_CHCTL2(SPINDLE_PWM_TIMER) |= TIMER_CHCTL2_CH0P;
-            //SPINDLE_PWM_TIMER->CR2 |= TIM_CR2_OIS1;
             TIMER_CTL1(SPINDLE_PWM_TIMER) |= TIMER_CTL1_ISO0;
         } else {
-            //SPINDLE_PWM_TIMER->CCER &= ~TIM_CCER_CC1P;
             TIMER_CHCTL2(SPINDLE_PWM_TIMER) &= ~TIMER_CHCTL2_CH0P;
-            //SPINDLE_PWM_TIMER->CR2 &= ~TIM_CR2_OIS1;
-
         }
-        //SPINDLE_PWM_TIMER->CCER |= TIM_CCER_CC1E;
         TIMER_CHCTL2(SPINDLE_PWM_TIMER) |= TIMER_CHCTL2_CH0EN;
 /*
 #endif
 */
-        //SPINDLE_PWM_TIMER->CR1 |= TIM_CR1_CEN;
         TIMER_CTL0(SPINDLE_PWM_TIMER) |= TIMER_CTL0_CEN;
         spindle_pwm.flags.invert_pwm = Off; // Handled in hardware
     } else {
@@ -1020,10 +974,8 @@ static spindle_state_t spindleGetState (spindle_ptrs_t *spindle)
 {
     spindle_state_t state = { settings.pwm_spindle.invert.mask };
     UNUSED(spindle);
-    //state.on = (SPINDLE_ENABLE_PORT->IDR & SPINDLE_ENABLE_BIT) != 0;
     state.on = (GPIO_ISTAT(SPINDLE_ENABLE_PORT) & SPINDLE_ENABLE_BIT) != 0;
 #ifdef SPINDLE_DIRECTION_PIN
-    //state.ccw = (SPINDLE_DIRECTION_PORT->IDR & SPINDLE_DIRECTION_BIT) != 0;
     state.ccw = (GPIO_ISTAT(SPINDLE_DIRECTION_PORT) & SPINDLE_DIRECTION_BIT) != 0;
 #endif
     state.value ^= settings.pwm_spindle.invert.mask;
@@ -1051,10 +1003,8 @@ static void coolantSetState (coolant_state_t mode)
 static coolant_state_t coolantGetState (void)
 {
     coolant_state_t state = (coolant_state_t){settings.coolant.invert.mask};
-    //state.flood = (COOLANT_FLOOD_PORT->IDR & COOLANT_FLOOD_BIT) != 0;
     state.flood = (GPIO_ISTAT(COOLANT_FLOOD_PORT) & COOLANT_FLOOD_BIT) != 0;
 #ifdef COOLANT_MIST_PIN
-    //state.mist  = (COOLANT_MIST_PORT->IDR & COOLANT_MIST_BIT) != 0;
     state.mist  = (GPIO_ISTAT(COOLANT_MIST_PORT) & COOLANT_MIST_BIT) != 0;
 #endif
     state.value ^= settings.coolant.invert.mask;
@@ -1121,7 +1071,6 @@ void settings_changed (settings_t *settings, settings_changed_flags_t changed)
     hal.stepper.go_idle(true);
 
     if(IOInitDone) {
-        //GPIO_InitTypeDef GPIO_Init = {.Speed = GPIO_SPEED_FREQ_HIGH};
 #if DRIVER_SPINDLE_PWM_ENABLE
         if(changed.spindle) {
             spindleConfig(spindle_get_hal(spindle_id, SpindleHAL_Configured));
@@ -1169,7 +1118,6 @@ void settings_changed (settings_t *settings, settings_changed_flags_t changed)
         NVIC_DisableIRQ(EXTI5_9_IRQn);
 #endif
 #if DRIVER_IRQMASK & 0xFC00
-        //HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
         NVIC_DisableIRQ(EXTI10_15_IRQn);
 #endif
 
@@ -1202,59 +1150,75 @@ void settings_changed (settings_t *settings, settings_changed_flags_t changed)
                     input->mode.pull_mode = settings->limits.disable_pullup.z ? PullMode_None : PullMode_Up;
                     input->mode.irq_mode = limit_fei.z ? IRQ_Mode_Falling : IRQ_Mode_Rising;
                     break;
-                case Input_LimitA:
-                case Input_LimitA_Max:
-                    input->mode.pull_mode = settings->limits.disable_pullup.a ? PullMode_None : PullMode_Up;
-                    input->mode.irq_mode = limit_fei.a ? IRQ_Mode_Falling : IRQ_Mode_Rising;
-                    break;
-                case Input_LimitB:
-                case Input_LimitB_Max:
-                    input->mode.pull_mode = settings->limits.disable_pullup.b ? PullMode_None : PullMode_Up;
-                    input->mode.irq_mode = limit_fei.b ? IRQ_Mode_Falling : IRQ_Mode_Rising;
-                    break;
-                case Input_LimitC:
-                case Input_LimitC_Max:
-                    input->mode.pull_mode = settings->limits.disable_pullup.c ? PullMode_None : PullMode_Up;
-                    input->mode.irq_mode = limit_fei.c ? IRQ_Mode_Falling : IRQ_Mode_Rising;
-                    break;
-                default:
-                    break;
-            }
+                    #ifdef A_AXIS
+                    case Input_LimitA:
+                    case Input_LimitA_Max:
+                        input->mode.pull_mode = settings->limits.disable_pullup.a ? PullMode_None : PullMode_Up;
+                        input->mode.irq_mode = limit_fei.a ? IRQ_Mode_Falling : IRQ_Mode_Rising;
+                        break;
+    #endif
+    #ifdef B_AXIS
+                    case Input_LimitB:
+                    case Input_LimitB_Max:
+                        input->mode.pull_mode = settings->limits.disable_pullup.b ? PullMode_None : PullMode_Up;
+                        input->mode.irq_mode = limit_fei.b ? IRQ_Mode_Falling : IRQ_Mode_Rising;
+                        break;
+    #endif
+    #ifdef C_AXIS
+                    case Input_LimitC:
+                    case Input_LimitC_Max:
+                        input->mode.pull_mode = settings->limits.disable_pullup.c ? PullMode_None : PullMode_Up;
+                        input->mode.irq_mode = limit_fei.c ? IRQ_Mode_Falling : IRQ_Mode_Rising;
+                        break;
+    #endif
+    #ifdef U_AXIS
+                    case Input_LimitU:
+                    case Input_LimitU_Max:
+                        input->mode.pull_mode = settings->limits.disable_pullup.u ? PullMode_None : PullMode_Up;
+                        input->mode.irq_mode = limit_fei.u ? IRQ_Mode_Falling : IRQ_Mode_Rising;
+                        break;
+    #endif
+    #ifdef V_AXIS
+                    case Input_LimitV:
+                    case Input_LimitV_Max:
+                        input->mode.pull_mode = settings->limits.disable_pullup.v ? PullMode_None : PullMode_Up;
+                        input->mode.irq_mode = limit_fei.v ? IRQ_Mode_Falling : IRQ_Mode_Rising;
+                        break;
+    #endif
+    #ifdef W_AXIS
+                    case Input_LimitW:
+                    case Input_LimitW_Max:
+                        input->mode.pull_mode = settings->limits.disable_pullup.w ? PullMode_None : PullMode_Up;
+                        input->mode.irq_mode = limit_fei.w ? IRQ_Mode_Falling : IRQ_Mode_Rising;
+                        break;
+    #endif
+                    default:
+                        break;
+                }
 
             if(input->group == PinGroup_AuxInput) {
                 if(input->cap.irq_mode != IRQ_Mode_None) {
-                    // Map interrupt to pin
-                    //uint32_t extireg = SYSCFG->EXTICR[input->pin >> 2] & ~(0b1111 << ((input->pin & 0b11) << 2));
-                    //extireg |= ((uint32_t)(GPIO_GET_INDEX(input->port)) << ((input->pin & 0b11) << 2));
-                    //SYSCFG->EXTICR[input->pin >> 2] = extireg;
                     gpio_exti_source_select((uint8_t)GPIO_GET_INDEX(input->port), (uint8_t)input->pin);
                 }
             }
-            //GPIO_Init.Pin = input->bit;
-            //GPIO_Init.Pull = input->mode.pull_mode == PullMode_Up ? GPIO_PULLUP : GPIO_NOPULL;
             switch(input->mode.irq_mode) {
                 case IRQ_Mode_Rising:
-                    //GPIO_Init.Mode = GPIO_MODE_IT_RISING;
                     EXTI_RTEN  |= (1<<input->pin);
                     EXTI_INTEN |= (1<<input->pin);
                     EXTI_EVEN  |= (1<<input->pin);
                     break;
                 case IRQ_Mode_Falling:
-                    //GPIO_Init.Mode = GPIO_MODE_IT_FALLING;
                     EXTI_FTEN  |= (1<<input->pin);
                     EXTI_INTEN |= (1<<input->pin);
                     EXTI_EVEN  |= (1<<input->pin);
                     break;
                 case IRQ_Mode_Change:
-                    //GPIO_Init.Mode = GPIO_MODE_IT_RISING_FALLING;
                     EXTI_FTEN  |= (1<<input->pin);
                     EXTI_RTEN  |= (1<<input->pin);
                     EXTI_INTEN |= (1<<input->pin);
                     EXTI_EVEN  |= (1<<input->pin);
                     break;
             }
-            //HAL_GPIO_Init(input->port, &GPIO_Init);
-            //gpio_init((uint32_t)input->port, pull_mode_in, GPIO_OSPEED_50MHZ, input->pin);
             uint32_t tmpctl = input->pin>7 ? input->port->CTL1 : input->port->CTL0;
             tmpctl &= ~(0b1111<<((input->pin&7)<<2)); // bitmask
             tmpctl |= (input->mode.pull_mode == PullMode_None ? 4 : 8)<<((input->pin&7)<<2); // 0b 01=nopull/10=pull 00=in_mode 
@@ -1265,7 +1229,6 @@ void settings_changed (settings_t *settings, settings_changed_flags_t changed)
         } while(i);
         uint32_t irq_mask = DRIVER_IRQMASK|aux_irq;
 
-        //__HAL_GPIO_EXTI_CLEAR_IT(irq_mask);
         exti_deinit(); //???
 
         if(irq_mask & (1<<0)) {
@@ -1396,17 +1359,7 @@ void setPeriphPinDescription (const pin_function_t function, const pin_group_t g
 
 static bool driver_setup (settings_t *settings)
 {
-    //    Interrupt_disableSleepOnIsrExit();
-    //__HAL_RCC_TIM1_CLK_ENABLE();
-    //__HAL_RCC_TIM2_CLK_ENABLE();
-    //__HAL_RCC_TIM3_CLK_ENABLE();
-    //__HAL_RCC_TIM4_CLK_ENABLE();
     rcu_periph_clock_enable(RCU_STEPPER_TIMER);
-
-    //GPIO_InitTypeDef GPIO_Init = {
-    //    .Speed = GPIO_SPEED_FREQ_HIGH,
-    //    .Mode = GPIO_MODE_OUTPUT_PP
-    //};
     /*************************
      *  Output signals init  *
      *************************/
@@ -1415,48 +1368,32 @@ static bool driver_setup (settings_t *settings)
     axes_signals_t st_enable = st_get_enable_out();
 
     for(i = 0; i < sizeof(outputpin) / sizeof(output_signal_t); i++) {
-        //GPIO_Init.Pin = 1 << outputpin[i].pin;
-        //GPIO_Init.Mode = outputpin[i].mode.open_drain ? GPIO_MODE_OUTPUT_OD : GPIO_MODE_OUTPUT_PP;
 
         if(outputpin[i].group == PinGroup_MotorChipSelect ||
             outputpin[i].group == PinGroup_MotorUART ||
              outputpin[i].id == Output_SPICS ||
              (outputpin[i].group == PinGroup_StepperEnable && (st_enable.mask & xbar_fn_to_axismask(outputpin[i].id).mask)))
-            //outputpin[i].port->BSRR = GPIO_Init.Pin;
             outputpin[i].port->BOP = 1 << outputpin[i].pin;
-        //HAL_GPIO_Init(outputpin[i].port, &GPIO_Init);
         uint32_t tmpctl = outputpin[i].pin>7 ? outputpin[i].port->CTL1 : outputpin[i].port->CTL0;
         tmpctl &= ~(0b1111<<((outputpin[i].pin&7)<<2));
         tmpctl |= (0b0011|((uint32_t)outputpin[i].mode.open_drain<<2))<<((outputpin[i].pin&7)<<2);
         if (outputpin[i].pin>7) outputpin[i].port->CTL1 = tmpctl;
          else outputpin[i].port->CTL0 = tmpctl;
-        //gpio_init((uint32_t)outputpin[i].port, outputpin[i].mode.open_drain ? GPIO_MODE_OUT_OD : GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ, outputpin[i].pin);
 
     }
 
  // Stepper init
-    //STEPPER_TIMER->CR1 = 0;
     timer_deinit(STEPPER_TIMER);
-//    STEPPER_TIMER->PSC = STEPPER_TIMER_DIV - 1;
-    //STEPPER_TIMER->CR1 = TIM_CR1_DIR|TIM_CR1_ARPE;
     TIMER_CTL0(STEPPER_TIMER) = TIMER_CTL0_DIR|TIMER_CTL0_ARSE;
-
     NVIC_SetPriority(STEPPER_TIMER_IRQn, 0);
     NVIC_EnableIRQ(STEPPER_TIMER_IRQn);
 
 #if DRIVER_SPINDLE_PWM_ENABLE
-    //GPIO_Init.Pin = 1 << SPINDLE_PWM_PIN;
-    //GPIO_Init.Mode = GPIO_MODE_AF_PP;
-    //GPIO_Init.Pull = GPIO_NOPULL;
-    //GPIO_Init.Alternate = GPIO_AF6_TIM1;
-    //HAL_GPIO_Init(SPINDLE_PWM_PORT, &GPIO_Init);
-    //GPIO_Init.Alternate = 0;
     uint32_t tmpctl = SPINDLE_PWM_PIN>7 ? ((GPIO_TypeDef *)SPINDLE_PWM_PORT)->CTL1 : ((GPIO_TypeDef *)SPINDLE_PWM_PORT)->CTL0;
     tmpctl &= ~(0b1111<<((SPINDLE_PWM_PIN&7)<<2)); // 4bit bitmask
     tmpctl |= (0b1011)<<((SPINDLE_PWM_PIN&7)<<2); // 0b 10(AF_PP)11(Out_mode_50MHz)
     if (SPINDLE_PWM_PIN>7) ((GPIO_TypeDef *)SPINDLE_PWM_PORT)->CTL1 = tmpctl;
      else ((GPIO_TypeDef *)SPINDLE_PWM_PORT)->CTL0 = tmpctl;
-    //gpio_init((uint32_t)SPINDLE_PWM_PORT, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, SPINDLE_PWM_PIN);
 
 #endif
 
@@ -1499,7 +1436,7 @@ bool driver_init (void)
 #endif
     hal.driver_setup = driver_setup;
     hal.f_mcu = SystemCoreClock / 1000000UL;
-    /* CK_APB1 for TIMER1,2,3,4,5,6,11,12,13; CK_APB2 for TIMER0,7,8,9,10*/
+    /* CK_APB1 for TIMER1,2,3,4,5,6,11,12,13; CK_APB2 for TIMER0,7,8,9,10 */
     hal.f_step_timer = rcu_clock_freq_get(CK_APB1); //  HAL_RCC_GetPCLK2Freq();
     hal.step_us_min = 3.5f;
     hal.rx_buffer_size = RX_BUFFER_SIZE;
@@ -1517,19 +1454,20 @@ bool driver_init (void)
     hal.coolant.get_state = coolantGetState;
 
 #if CONTROL_ENABLE & CONTROL_HALT
-    //hal.signals_cap.reset = On;
     hal.signals_cap.e_stop = On;
 #endif
+
 #if CONTROL_ENABLE & CONTROL_FEED_HOLD
     hal.signals_cap.feed_hold = On;
 #endif
+
 #if CONTROL_ENABLE & CONTROL_CYCLE_START
     hal.signals_cap.cycle_start = On;
 #endif
 
-    #ifdef PROBE_PIN
-    hal.probe.get_state = probeGetState;
-    hal.probe.configure = probeConfigure;
+#ifdef PROBE_PIN
+//    hal.probe.get_state = probeGetState;
+//    hal.probe.configure = probeConfigure;
 #endif
 
     hal.control.get_state = systemGetState;
@@ -1642,11 +1580,14 @@ bool driver_init (void)
         if(input->group == PinGroup_AuxInput) {
             if(aux_inputs.pins.inputs == NULL)
                 aux_inputs.pins.inputs = input;
+
             aux_inputs.n_pins++;
+
             if(!(input->id >= Input_Aux0 && input->id <= Input_AuxMax)) {
                 input->id = Input_Aux0 + input->user_port;
-                aux_ctrl_remap_explicit(input->port, input->pin, input->user_port, input);
+                aux_ctrl_remap_explicit((aux_gpio_t){ .port = input->port, .pin = input->pin }, input->user_port, input);
             }
+
             if((input->cap.debounce = input->cap.irq_mode != IRQ_Mode_None)) {
                 aux_irq |= input->bit;
                 pin_irq[__builtin_ffs(input->bit) - 1] = input;
@@ -1672,14 +1613,14 @@ bool driver_init (void)
             if(aux_outputs.pins.outputs == NULL)
                 aux_outputs.pins.outputs = output;
             output->id = (pin_function_t)(Output_Aux0 + aux_outputs.n_pins);
-            aux_out_remap_explicit(output->port, output->pin, aux_outputs.n_pins, output);
+            aux_out_remap_explicit((aux_gpio_t){ .port = output->port, .pin = output->pin }, aux_outputs.n_pins, output);
             aux_outputs.n_pins++;
         }
     }
 
-//    ioports_init(&aux_inputs, &aux_outputs);
+    ioports_init(&aux_inputs, &aux_outputs);
     aux_ctrl_claim_ports(aux_claim_explicit, NULL);
-    aux_ctrl_claim_out_ports(aux_out_claim_explicit, NULL);
+    aux_ctrl_claim_out_ports(NULL, NULL);
 
 #ifdef HAS_BOARD_INIT
     board_init();

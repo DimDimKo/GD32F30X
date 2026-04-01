@@ -117,7 +117,7 @@ static void serialRxCancel (void)
 //
 // Writes a character to the serial output stream
 //
-static bool serialPutC (const char c)
+static bool serialPutC (const uint8_t c)
 {
     uint16_t next_head = BUFNEXT(txbuf.head, txbuf);    // Get pointer to next free slot in buffer
 
@@ -145,14 +145,17 @@ static void serialWriteS (const char *s)
 //
 // serialGetC - returns -1 if no data available
 //
-static int16_t serialGetC (void)
+static int32_t serialGetC (void)
 {
-    uint_fast16_t tail = rxbuf.tail;    // Get buffer pointer
+    uint_fast16_t tail = rxbuf.tail;            // Get buffer pointer
+
     if(tail == rxbuf.head)
         return -1; // no data available
-    char data = rxbuf.data[tail];       // Get next character
-    rxbuf.tail = BUFNEXT(tail, rxbuf);  // and update pointer
-    return (int16_t)data;
+
+    int32_t data = (int32_t)rxbuf.data[tail];   // Get next character
+    rxbuf.tail = BUFNEXT(tail, rxbuf);          // and update pointer
+
+    return data;
 }
 
 static bool serialSuspendInput (bool suspend)
@@ -160,7 +163,7 @@ static bool serialSuspendInput (bool suspend)
     return stream_rx_suspend(&rxbuf, suspend);
 }
 
-static bool serialEnqueueRtCommand (char c)
+static bool serialEnqueueRtCommand (uint8_t c)
 {
     return enqueue_realtime_command(c);
 }

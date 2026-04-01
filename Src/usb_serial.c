@@ -102,7 +102,7 @@ static inline bool usb_write (void)
 //
 // Writes a single character to the USB output stream, blocks if buffer full
 //
-static bool usbPutC (const char c)
+static bool usbPutC (const uint8_t c)
 {
     static uint8_t buf[1];
     *buf = c;
@@ -147,7 +147,7 @@ static void usbWriteS (const char *s)
 //
 // Writes a number of characters from string to the USB output stream, blocks if buffer full
 //
-static void usbWrite (const char *s, uint16_t length)
+static void usbWrite (const uint8_t *s, uint16_t length)
 {
     if(length == 0)
         return;
@@ -175,7 +175,7 @@ static void usbWrite (const char *s, uint16_t length)
 //
 // usbGetC - returns -1 if no data available
 //
-static int16_t usbGetC (void)
+static int32_t usbGetC (void)
 {
     uint_fast16_t tail = rxbuf.tail;    // Get buffer pointer
     if(tail == rxbuf.head)
@@ -190,7 +190,7 @@ static bool usbSuspendInput (bool suspend)
     return stream_rx_suspend(&rxbuf, suspend);
 }
 
-static bool usbEnqueueRtCommand (char c)
+static bool usbEnqueueRtCommand (uint8_t c)
 {
     return enqueue_realtime_command(c);
 }
