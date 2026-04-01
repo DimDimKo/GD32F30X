@@ -19,6 +19,8 @@
   along with grblHAL. If not, see <http://www.gnu.org/licenses/>.
 */
 
+/* Warning!! This board config is full copy of generic_map.h */
+
 #if N_ABC_MOTORS > 1 || N_GANGED
 #error Axis configuration not supported!
 #endif
