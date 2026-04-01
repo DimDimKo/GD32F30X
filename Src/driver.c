@@ -1150,7 +1150,7 @@ void settings_changed (settings_t *settings, settings_changed_flags_t changed)
                     input->mode.pull_mode = settings->limits.disable_pullup.z ? PullMode_None : PullMode_Up;
                     input->mode.irq_mode = limit_fei.z ? IRQ_Mode_Falling : IRQ_Mode_Rising;
                     break;
-                    #ifdef A_AXIS
+    #ifdef A_AXIS
                     case Input_LimitA:
                     case Input_LimitA_Max:
                         input->mode.pull_mode = settings->limits.disable_pullup.a ? PullMode_None : PullMode_Up;

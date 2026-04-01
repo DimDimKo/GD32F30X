@@ -19,7 +19,7 @@
   along with grblHAL. If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* Warning!! This board config is full copy of generic_map.h */
+/* Warning!! This board config is not full!!! */
 
 #if N_ABC_MOTORS > 1 || N_GANGED
 #error Axis configuration not supported!
@@ -31,16 +31,16 @@
 
 // Define step pulse output pins.
 #define STEP_PORT               (void *)GPIOA
-#define X_STEP_PIN              1
-#define Y_STEP_PIN              2
-#define Z_STEP_PIN              3
+#define X_STEP_PIN              6
+#define Y_STEP_PIN              4
+#define Z_STEP_PIN              2
 #define STEP_OUTMODE            GPIO_MAP
 
 // Define step direction output pins.
 #define DIRECTION_PORT          (void *)GPIOA
-#define X_DIRECTION_PIN         4
+#define X_DIRECTION_PIN         7
 #define Y_DIRECTION_PIN         5
-#define Z_DIRECTION_PIN         6
+#define Z_DIRECTION_PIN         3
 #define DIRECTION_OUTMODE       GPIO_MAP
 
 // Define stepper driver enable/disable output pin.
