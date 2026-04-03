@@ -282,15 +282,10 @@ static void stepperEnable (axes_signals_t enable, bool hold)
 static void stepperWakeUp (void)
 {
     hal.stepper.enable((axes_signals_t){AXES_BITMASK}, false);
-    //STEPPER_TIMER->ARR = hal.f_step_timer / 500; // ~2ms delay to allow drivers time to wake up.
     TIMER_CAR(STEPPER_TIMER) = hal.f_step_timer/500;
-    //STEPPER_TIMER->EGR = TIM_EGR_UG;
     TIMER_SWEVG(STEPPER_TIMER) = TIMER_SWEVG_UPG;
-    //STEPPER_TIMER->SR = 0;
     TIMER_INTF(STEPPER_TIMER) = 0;
-    //STEPPER_TIMER->DIER = TIM_DIER_UIE;
     TIMER_DMAINTEN(STEPPER_TIMER) = TIMER_DMAINTEN_UPIE;
-    //STEPPER_TIMER->CR1 |= TIM_CR1_CEN;
     TIMER_CTL0(STEPPER_TIMER) |= TIMER_CTL0_CEN;
 
 }
@@ -298,7 +293,6 @@ static void stepperWakeUp (void)
 // Sets up stepper driver interrupt timeout, "Normal" version
 static void stepperCyclesPerTick (uint32_t cycles_per_tick)
 {
-   //STEPPER_TIMER->ARR = cycles_per_tick < (1UL << 20) ? max(cycles_per_tick, step_pulse.t_min_period) : 0x000FFFFFUL; 
    TIMER_CAR(STEPPER_TIMER) = cycles_per_tick < (1UL << 20) ? max(cycles_per_tick, step_pulse.t_min_period) : 0x000FFFFFUL;
 }
 
@@ -307,10 +301,8 @@ static void stepperCyclesPerTick (uint32_t cycles_per_tick)
 inline static __attribute__((always_inline)) void stepper_step_out (axes_signals_t step_out)
 {
 #if STEP_OUTMODE == GPIO_MAP
-    //STEP_PORT->ODR = (STEP_PORT->ODR & ~STEP_MASK) | step_outmap[step_out.value];
 	GPIO_OCTL(STEP_PORT) = (GPIO_OCTL(STEP_PORT) & ~STEP_MASK) | step_outmap[step_out.value];
 #else
-    //STEP_PORT->ODR = (STEP_PORT->ODR & ~STEP_MASK) | ((step_out.mask ^ settings.steppers.step_invert.mask) << STEP_OUTMODE);
     GPIO_OCTL(STEP_PORT) = (GPIO_OCTL(STEP_PORT) & ~STEP_MASK) | ((step_out.mask ^ settings.steppers.step_invert.mask) << STEP_OUTMODE);
 #endif
 }
@@ -320,10 +312,8 @@ inline static __attribute__((always_inline)) void stepper_step_out (axes_signals
 inline static __attribute__((always_inline)) void stepper_dir_out (axes_signals_t dir_out)
 {
 #if DIRECTION_OUTMODE == GPIO_MAP
-    //DIRECTION_PORT->ODR = (DIRECTION_PORT->ODR & ~DIRECTION_MASK) | dir_outmap[dir_out.value];
     GPIO_OCTL(DIRECTION_PORT) = (GPIO_OCTL(DIRECTION_PORT) & ~DIRECTION_MASK) | dir_outmap[dir_out.value];
 #else
-    //DIRECTION_PORT->ODR = (DIRECTION_PORT->ODR & ~DIRECTION_MASK) | ((dir_out.mask ^ settings.steppers.dir_invert.mask) << DIRECTION_OUTMODE);
     GPIO_OCTL(DIRECTION_PORT) = (GPIO_OCTL(DIRECTION_PORT) & ~DIRECTION_MASK) | ((dir_out.mask ^ settings.steppers.dir_invert.mask) << DIRECTION_OUTMODE);
 #endif
 }
@@ -331,7 +321,6 @@ inline static __attribute__((always_inline)) void stepper_dir_out (axes_signals_
 // Disables stepper driver interrupts
 static void stepperGoIdle (bool clear_signals)
 {
-    //STEPPER_TIMER->DIER &= ~TIM_DIER_UIE;
     TIMER_DMAINTEN(STEPPER_TIMER) &= ~TIMER_DMAINTEN_UPIE;
     if(clear_signals) {
         stepper_dir_out((axes_signals_t){0});
@@ -342,17 +331,12 @@ static void stepperGoIdle (bool clear_signals)
 static inline __attribute__((always_inline)) void _stepper_step_out (axes_signals_t step_out)
 {
     stepper_step_out(step_out);
-    //if((STEPPER_TIMER->SR & TIM_SR_UIF) || STEPPER_TIMER->CNT < step_pulse.t_on_off_min) {
     if((TIMER_INTF(STEPPER_TIMER) & TIMER_INTF_UPIF) || TIMER_CNT(STEPPER_TIMER) < step_pulse.t_on_off_min) {
-        //STEPPER_TIMER->CNT = step_pulse.t_on_off_min;
         TIMER_CNT(STEPPER_TIMER) = step_pulse.t_on_off_min;
         NVIC_ClearPendingIRQ(STEPPER_TIMER_IRQn);
     }
-    //STEPPER_TIMER->CCR1 = STEPPER_TIMER->CNT - step_pulse.t_off;
     TIMER_CH0CV(STEPPER_TIMER) = TIMER_CNT(STEPPER_TIMER) - step_pulse.t_off;
-    //STEPPER_TIMER->SR = 0;
     TIMER_INTF(STEPPER_TIMER) = 0;
-    //STEPPER_TIMER->DIER |= TIM_DIER_CC1IE;
     TIMER_DMAINTEN(STEPPER_TIMER) |= TIMER_DMAINTEN_CH0IE;
 }
 
@@ -381,19 +365,12 @@ static void stepperPulseStartDelayed (stepper_t *stepper)
             if(stepper->step_out.bits & stepper->dir_changed.bits) {
 
                 step_pulse.out = stepper->step_out; // Store out_bits
-                //if(STEPPER_TIMER->CNT < step_pulse.t_dly_off_min) {
                 if(TIMER_CNT(STEPPER_TIMER) < step_pulse.t_dly_off_min) {
-                    //STEPPER_TIMER->CNT = step_pulse.t_dly_off_min;
                     TIMER_CNT(STEPPER_TIMER) = step_pulse.t_dly_off_min;
                     NVIC_ClearPendingIRQ(STEPPER_TIMER_IRQn);
                 }
-
-                //STEPPER_TIMER->CCR2 = STEPPER_TIMER->CNT - step_pulse.t_on;
                 TIMER_CH1CV(STEPPER_TIMER) = TIMER_CNT(STEPPER_TIMER) - step_pulse.t_on;
-
-                //STEPPER_TIMER->SR = 0;
                 TIMER_INTF(STEPPER_TIMER) = 0;
-                //STEPPER_TIMER->DIER |= TIM_DIER_CC2IE;
                 TIMER_DMAINTEN(STEPPER_TIMER) |= TIMER_DMAINTEN_CH1IE;
             } else
                 _stepper_step_out(stepper->step_out);
@@ -444,7 +421,6 @@ inline static limit_signals_t limitsGetState (void)
     signals.min.a = (bits & A_LIMIT_BIT) != 0;
   #endif
 #else
-    //signals.min.value = (uint8_t)((LIMIT_PORT->IDR & LIMIT_MASK) >> LIMIT_INMODE);
     signals.min.value = (uint8_t)((GPIO_ISTAT(LIMIT_PORT) & LIMIT_MASK) >> LIMIT_INMODE);
 #endif
 
@@ -755,20 +731,6 @@ static void aux_assign_irq (void)
         }
     }
 }
-
-#if 0
-bool aux_out_claim_explicit (aux_ctrl_out_t *aux_ctrl)
-{
-    xbar_t *pin;
-
-    if((pin = ioport_claim(Port_Digital, Port_Output, &aux_ctrl->aux_port, NULL)))
-        ioport_set_function(pin, aux_ctrl->function, NULL);
-    else
-        aux_ctrl->aux_port = 0xFF;
-
-    return aux_ctrl->aux_port != 0xFF;
-}
-#endif
 
 #if DRIVER_SPINDLE_ENABLE
 
