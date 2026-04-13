@@ -46,7 +46,15 @@
 #endif
 
 #if USB_SERIAL_CDC
-#include "usb_serial.h"
+    #ifdef CDC_TYPE_CMSIS
+        #include "usb_cmsis.h"
+    #else
+        #ifdef CDC_TYPE_CH340
+            #include "usb_ch340.h"
+        #else
+            #include "usb_serial.h"
+        #endif
+    #endif
 #endif
 
 #if EEPROM_ENABLE

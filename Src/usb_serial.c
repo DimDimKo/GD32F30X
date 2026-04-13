@@ -28,11 +28,6 @@
 
 #include "main.h"
 
-/* GD32 usb lib*/
-//#include "cdc_acm_core.h"
-//#include "usbd_conf.h"
-//usb_dev usbd_cdc;
-
 /* STM32 usb lib*/
 #include "usbd_cdc_if.h"
 #include "usb_device.h"
@@ -41,6 +36,8 @@ static stream_rx_buffer_t rxbuf = {0};
 static stream_block_tx_buffer2_t txbuf = {0};
 static enqueue_realtime_command_ptr enqueue_realtime_command = protocol_enqueue_realtime_command;
 volatile usb_linestate_t usb_linestate = {0};
+
+extern PCD_HandleTypeDef hpcd_USB_FS;
 
 static bool is_connected (void)
 {
@@ -53,7 +50,6 @@ static bool is_connected (void)
 static uint16_t usbRxFree (void)
 {
     uint16_t tail = rxbuf.tail, head = rxbuf.head;
-
     return RX_BUFFER_SIZE - BUFCOUNT(head, tail, RX_BUFFER_SIZE);
 }
 
@@ -246,3 +242,16 @@ void usbBufferInput (uint8_t *data, uint32_t length)
         data++;                                                 // next...
     }
 }
+
+/*!
+    \brief      this function handles USBD interrupt
+    \param[in]  none
+    \param[out] none
+    \retval     none
+*/
+#if USB_SERIAL_CDC
+void USBD_LP_CAN0_RX0_IRQHandler (void)
+{
+    HAL_PCD_IRQHandler(&hpcd_USB_FS);
+}
+#endif
