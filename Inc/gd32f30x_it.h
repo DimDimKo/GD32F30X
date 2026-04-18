@@ -57,7 +57,7 @@ void PendSV_Handler(void);
 /* this function handles SysTick exception */
 // void SysTick_Handler(void);
 /* this function handles USBD low priority interrupt */
-void USBD_LP_CAN0_RX0_IRQHandler(void);
+void USBD_LP_CAN0_RX0_IRQHandler (void);
 #ifdef USBD_DOUBLE_BUFFER_ENABLE
 /* this function handles USBD high priority interrupt */
 void USBD_HP_CAN0_TX_IRQHandler(void);

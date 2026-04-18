@@ -202,7 +202,7 @@ const struct wLANGID \
         uint16_t bString[1];      \
     \
 } \
-wLANGID __attribute__((used, section("usb_string"))) = {0x04, 0x03, lng_id};
+wLANGID __attribute__((used, section("usb_string"))) = {0x04, 0x03, {lng_id}};
 
 #pragma pack(push, 1)
 

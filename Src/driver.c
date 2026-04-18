@@ -45,18 +45,6 @@
 #include "diskio.h"
 #endif
 
-#if USB_SERIAL_CDC
-    #ifdef CDC_TYPE_CMSIS
-        #include "usb_cmsis.h"
-    #else
-        #ifdef CDC_TYPE_CH340
-            #include "usb_ch340.h"
-        #else
-            #include "usb_serial.h"
-        #endif
-    #endif
-#endif
-
 #if EEPROM_ENABLE
 #include "eeprom/eeprom.h"
 #endif
@@ -67,6 +55,10 @@
 
 #if FLASH_ENABLE
 #include "flash.h"
+#endif
+
+#if USB_SERIAL_CDC
+        #include "usb_serial.h"
 #endif
 
 #if !I2C_STROBE_ENABLE
@@ -1351,6 +1343,12 @@ static bool driver_setup (settings_t *settings)
          else outputpin[i].port->CTL0 = tmpctl;
 
     }
+    #ifdef B2_LED //Configure LED pin
+        uint32_t tctl = GPIO_CTL0(GPIOB);
+        tctl &= 0xFFFFF0FF;
+        tctl |= 0x300; // B2 pin set to PP-out mode
+        GPIO_CTL0(GPIOB) = tctl;
+    #endif // B2_LED
 
  // Stepper init
     timer_deinit(STEPPER_TIMER);
@@ -1611,30 +1609,22 @@ bool driver_init (void)
 ISR_CODE void STEPPER_TIMER_IRQHandler (void)
 {
     // Delayed step pulse handler
-    //if((STEPPER_TIMER->SR & STEPPER_TIMER->DIER) & TIM_SR_CC2IF) {
     if((TIMER_INTF(STEPPER_TIMER) & TIMER_DMAINTEN(STEPPER_TIMER)) & TIMER_INTF_CH1IF) {
-        //STEPPER_TIMER->DIER &= ~TIM_DIER_CC2IE;
         TIMER_DMAINTEN(STEPPER_TIMER) &= ~TIMER_DMAINTEN_CH1IE;
         _stepper_step_out(step_pulse.out);
     }
     // Step pulse off handler
-    //else if((STEPPER_TIMER->SR & STEPPER_TIMER->DIER) & TIM_SR_CC1IF) {
     else if((TIMER_INTF(STEPPER_TIMER) & TIMER_DMAINTEN(STEPPER_TIMER)) & TIMER_INTF_CH0IF) {
-        //STEPPER_TIMER->DIER &= ~TIM_DIER_CC1IE;
         TIMER_DMAINTEN(STEPPER_TIMER) &= ~TIMER_DMAINTEN_CH0IE;
         stepper_step_out((axes_signals_t){0});
-        //if((STEPPER_TIMER->SR & TIM_SR_UIF) || STEPPER_TIMER->CNT < step_pulse.t_off_min) {
         if((TIMER_INTF(STEPPER_TIMER) & TIMER_INTF_UPIF) || TIMER_CNT(STEPPER_TIMER) < step_pulse.t_off_min) {
             TIMER_CNT(STEPPER_TIMER) = step_pulse.t_off_min;
             NVIC_ClearPendingIRQ(STEPPER_TIMER_IRQn);
         }
-        //STEPPER_TIMER->SR = 0;
-        TIMER_INTF(STEPPER_TIMER) =0;
+        TIMER_INTF(STEPPER_TIMER) = 0;
     }
     // Stepper timeout handler
-    //else if(STEPPER_TIMER->SR & TIM_SR_UIF) {
     else if(TIMER_INTF(STEPPER_TIMER) & TIMER_INTF_UPIF) {
-        //STEPPER_TIMER->SR = 0;
         TIMER_INTF(STEPPER_TIMER) =0;
         hal.stepper.interrupt_callback();
     }

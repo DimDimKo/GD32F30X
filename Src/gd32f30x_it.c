@@ -33,7 +33,15 @@ OF SUCH DAMAGE.
 */
 
 #include "gd32f30x_it.h"
+#include "driver.h"
 
+#ifdef CDC_TYPE_STM32
+extern PCD_HandleTypeDef hpcd_USB_FS;
+#endif
+
+#ifdef CDC_TYPE_CMSIS
+extern void USB_LP_CAN1_RX0_IRQHandler();
+#endif
 /*!
     \brief      this function handles NMI exception
     \param[in]  none
@@ -121,6 +129,25 @@ void DebugMon_Handler(void)
 void PendSV_Handler(void)
 {
 }
+
+/*!
+    \brief      this function handles USBD interrupt
+    \param[in]  none
+    \param[out] none
+    \retval     none
+*/
+#if USB_SERIAL_CDC
+void USBD_LP_CAN0_RX0_IRQHandler (void)
+{
+    #ifdef CDC_TYPE_STM32
+        HAL_PCD_IRQHandler(&hpcd_USB_FS);
+        return;
+    #endif
+    #ifdef CDC_TYPE_CMSIS
+        USB_LP_CAN1_RX0_IRQHandler();
+    #endif
+}
+#endif
 
 #ifdef USBD_DOUBLE_BUFFER_ENABLE
 

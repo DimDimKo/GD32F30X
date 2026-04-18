@@ -16,7 +16,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "stm32f1xx.h"
+#include "gd32f30x.h"
+#include "usbd_lld_regs.h"
 #include "usblib.h"
 #include <stdlib.h>
 #include <string.h>
@@ -24,9 +25,9 @@
 #define __SECTION_PMA __attribute__((section(".PMA"))) /* USB PMA */
 #define SIZE_OF_BTABLE 64
 
-volatile USB_TypeDef_ *USB_ = (USB_TypeDef_ *)USB_BASE;
+volatile USB_TypeDef_ *USB_ = (USB_TypeDef_ *)USBD_BASE;
 __SECTION_PMA volatile USBLIB_EPBuf EPBufTable[EPCOUNT];
-#define USBEP ((volatile uint32_t *)USB_BASE)
+#define USBEP ((volatile uint32_t *)USBD_BASE)
 USBLIB_SetupPacket   *SetupPacket;
 volatile uint8_t      DeviceAddress = 0;
 volatile USBLIB_WByte LineState;
@@ -43,15 +44,14 @@ USBLIB_EPData EpData[EPCOUNT] = {
 
 void USBLIB_Init(void)
 {
-    NVIC_DisableIRQ(USB_LP_CAN1_RX0_IRQn);
-    RCC->APB1ENR |= RCC_APB1ENR_USBEN;
-
+    NVIC_DisableIRQ(USBD_LP_CAN0_RX0_IRQn);
+    RCU_APB1EN |= RCU_APB1EN_USBDEN;
     USB->CNTR   = USB_CNTR_FRES; /* Force USB Reset */
     USB->BTABLE = 0;
     USB->DADDR  = 0;
     USB->ISTR   = 0;
     USB->CNTR   = USB_CNTR_RESETM;
-    NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
+    NVIC_EnableIRQ(USBD_LP_CAN0_RX0_IRQn);
 }
 
 USBLIB_LineCoding lineCoding = {115200, 0, 0, 8};
@@ -77,6 +77,7 @@ const uint8_t USB_DEVICE_DESC[] =
         (uint8_t)3,                         //    iSerialNumbert
         (uint8_t)1                          //    bNumConfigurations
 };
+
 const uint8_t USBD_CDC_CFG_DESCRIPTOR[] =
     {
         /*Configuration Descriptor*/
@@ -196,7 +197,7 @@ void USBLIB_Reset(void)
 
         Addr += EpData[i].RX_Max;
 
-        *(uint16_t *)&(USB_->EPR[i]) = (uint16_t)(EpData[i].Number | EpData[i].Type | RX_VALID | TX_NAK);
+        *(uint16_t *)(&(USB_->EPR[i])) = (uint16_t)(EpData[i].Number | EpData[i].Type | RX_VALID | TX_NAK);
     }
 
     for (uint8_t i = EPCOUNT; i < 8; i++) {
@@ -311,7 +312,7 @@ void USBLIB_EPHandler(uint16_t Status)
     if (EP & EP_CTR_RX) { //something received
         USBLIB_Pma2EPBuf2(EPn);
         if (EPn == 0) { //If control endpoint
-            if (EP & USB_EP0R_SETUP) {
+            if (EP & EPxCS_SETUP) {
                 SetupPacket = (USBLIB_SetupPacket *)EpData[EPn].pRX_BUFF;
                 switch (SetupPacket->bRequest) {
                 case USB_REQUEST_SET_ADDRESS:

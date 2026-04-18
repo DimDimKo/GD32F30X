@@ -56,7 +56,6 @@ OF SUCH DAMAGE.
 #endif /* USE_FULL_ASSERT */    
 
 //stm32 defines
-
 /** 
   * @brief Universal Serial Bus Full Speed Device
   */
@@ -90,19 +89,6 @@ OF SUCH DAMAGE.
     __IO uint16_t BTABLE;          /*!< Buffer Table address register,          Address offset: 0x50 */
     __IO uint16_t RESERVEDC;       /*!< Reserved */
   } USB_TypeDef;
-
-  typedef struct
-{
-  __IO uint32_t CTL0;       /* Port control register 0 (GPIOx_CTL0, x=A..G)          Address offset: 0x00      */
-  __IO uint32_t CTL1;       /* Port control register 1 (GPIOx_CTL1, x=A..G)          Address offset: 0x04      */
-  __IO uint32_t ISTAT;      /* Port input status register (GPIOx_ISTAT, x=A..G       Address offset: 0x08      */
-  __IO uint32_t OCTL;       /* Port output control register (GPIOx_OCTL, x=A..G)     Address offset: 0x0C      */
-  __IO uint32_t BOP;        /* Port bit operate register (GPIOx_BOP, x=A..G)         Address offset: 0x10      */
-  __IO uint32_t BC;         /* Port bit clear register (GPIOx_BC, x=A..G)            Address offset: 0x14      */
-  __IO uint32_t LOCK;       /* Port configuration lock register (GPIOx_LOCK, x=A..G) Address offset: 0x18      */
-  __IO uint32_t RSV[8];     /* Reserved Address offset: 0x1C-0x38                                              */
-  __IO uint32_t SPD;        /* Port bit speed register (GPIOx_ SPD, x=A..G)          Address offset: 0x3C      */
-} GPIO_TypeDef;
 
 #define HAL_MODULE_ENABLED
 #define HAL_PCD_MODULE_ENABLED
@@ -227,6 +213,21 @@ OF SUCH DAMAGE.
 #define USB_EPRX_DTOG1                       ((uint16_t)0x1000U)               /*!< EndPoint RX Data TOGgle bit1 */
 #define USB_EPRX_DTOG2                       ((uint16_t)0x2000U)               /*!< EndPoint RX Data TOGgle bit1 */
 #define USB_EPRX_DTOGMASK  (USB_EPRX_STAT|USB_EPREG_MASK)
+#include "stm32f3xx_hal_pcd.h"
+
+
+typedef struct
+{
+  __IO uint32_t CTL0;       /* Port control register 0 (GPIOx_CTL0, x=A..G)          Address offset: 0x00      */
+  __IO uint32_t CTL1;       /* Port control register 1 (GPIOx_CTL1, x=A..G)          Address offset: 0x04      */
+  __IO uint32_t ISTAT;      /* Port input status register (GPIOx_ISTAT, x=A..G       Address offset: 0x08      */
+  __IO uint32_t OCTL;       /* Port output control register (GPIOx_OCTL, x=A..G)     Address offset: 0x0C      */
+  __IO uint32_t BOP;        /* Port bit operate register (GPIOx_BOP, x=A..G)         Address offset: 0x10      */
+  __IO uint32_t BC;         /* Port bit clear register (GPIOx_BC, x=A..G)            Address offset: 0x14      */
+  __IO uint32_t LOCK;       /* Port configuration lock register (GPIOx_LOCK, x=A..G) Address offset: 0x18      */
+  __IO uint32_t RSV[8];     /* Reserved Address offset: 0x1C-0x38                                              */
+  __IO uint32_t SPD;        /* Port bit speed register (GPIOx_ SPD, x=A..G)          Address offset: 0x3C      */
+} GPIO_TypeDef;
 
 #include "gd32f30x_rcu.h"
 // #include "gd32f30x_adc.h"
@@ -252,5 +253,4 @@ OF SUCH DAMAGE.
 #include "gd32f30x_misc.h"
 // #include "gd32f30x_enet.h"
 // #include "gd32f30x_exmc.h"
-#include "stm32f3xx_hal_pcd.h"
 #endif /* GD32F30X_LIBOPT_H */

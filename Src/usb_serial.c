@@ -28,20 +28,32 @@
 
 #include "main.h"
 
-/* STM32 usb lib*/
-#include "usbd_cdc_if.h"
-#include "usb_device.h"
+/* STM32 usb-cdc */
+//#ifdef CDC_TYPE_STM32
+    #include "usbd_cdc_if.h"
+    #include "usb_device.h"
+//#endif
+
+/* CMSIS-based usb-cdc */
+//#ifdef CDC_TYPE_CMSIS
+    #include "usblib.h"
+//#endif
+
+USBLIB_WByte _LineState;
 
 static stream_rx_buffer_t rxbuf = {0};
 static stream_block_tx_buffer2_t txbuf = {0};
 static enqueue_realtime_command_ptr enqueue_realtime_command = protocol_enqueue_realtime_command;
 volatile usb_linestate_t usb_linestate = {0};
 
-extern PCD_HandleTypeDef hpcd_USB_FS;
-
 static bool is_connected (void)
 {
-    return usb_linestate.pin.dtr && hal.get_elapsed_ticks() - usb_linestate.timestamp >= 15;
+    #ifdef CDC_TYPE_STM32
+        return usb_linestate.pin.dtr && hal.get_elapsed_ticks() - usb_linestate.timestamp >= 15;
+    #endif
+    #ifdef CDC_TYPE_CMSIS
+        return (bool)_LineState.L;
+    #endif
 }
 
 //
@@ -78,17 +90,23 @@ static inline bool usb_write (void)
 {
     static uint8_t dummy = 0;
     txbuf.s = txbuf.use_tx2data ? txbuf.data2 : txbuf.data;
-    
-    while(CDC_Transmit_FS((uint8_t *)txbuf.s, txbuf.length) == USBD_BUSY) {
-        if(!hal.stream_blocking_callback())
-            return false;
-    }
-    if(txbuf.length % 64 == 0) {
-        while(CDC_Transmit_FS(&dummy, 0) == USBD_BUSY) {
+    #ifdef CDC_TYPE_STM32
+        while(CDC_Transmit_FS((uint8_t *)txbuf.s, txbuf.length) == USBD_BUSY) {
             if(!hal.stream_blocking_callback())
                 return false;
         }
-    }
+        if(txbuf.length % 64 == 0) {
+            while(CDC_Transmit_FS(&dummy, 0) == USBD_BUSY) {
+                if(!hal.stream_blocking_callback())
+                    return false;
+            }
+        }
+    #endif // CDC_USB_STM32
+
+    #ifdef CDC_TYPE_CMSIS
+
+    #endif
+
     txbuf.use_tx2data = !txbuf.use_tx2data;
     txbuf.s = txbuf.use_tx2data ? txbuf.data2 : txbuf.data;
     txbuf.length = 0;
@@ -102,10 +120,17 @@ static bool usbPutC (const uint8_t c)
 {
     static uint8_t buf[1];
     *buf = c;
-    while(CDC_Transmit_FS(buf, 1) == USBD_BUSY) {
-        if(!hal.stream_blocking_callback())
-            return false;
-    }
+    
+    #ifdef CDC_TYPE_STM32
+        while(CDC_Transmit_FS(buf, 1) == USBD_BUSY) {
+            if(!hal.stream_blocking_callback())
+                return false;
+        }
+    #endif // CDC_TYPE_STM32
+
+    #ifdef CDC_USB_CMSIS
+
+    #endif
     return true;
 }
 
@@ -219,8 +244,12 @@ const io_stream_t *usbInit (void)
         .suspend_read = usbSuspendInput,
         .set_enqueue_rt_handler = usbSetRtHandler
     };
-
-    MX_USB_DEVICE_Init();
+    #ifdef CDC_TYPE_STM32
+        MX_USB_DEVICE_Init();
+    #endif
+    #ifdef CDC_TYPE_CMSIS
+        USBLIB_Init();
+    #endif
     txbuf.s = txbuf.data;
     txbuf.max_length = BLOCK_TX_BUFFER_SIZE;
     return &stream;
@@ -243,15 +272,20 @@ void usbBufferInput (uint8_t *data, uint32_t length)
     }
 }
 
-/*!
-    \brief      this function handles USBD interrupt
-    \param[in]  none
-    \param[out] none
-    \retval     none
-*/
-#if USB_SERIAL_CDC
-void USBD_LP_CAN0_RX0_IRQHandler (void)
+void uUSBLIB_LineStateHandler(USBLIB_WByte LineState)
 {
-    HAL_PCD_IRQHandler(&hpcd_USB_FS);
+    if (LineState.L)  {    // App connected to the virtual port
+        GPIO_BOP(GPIOB) = GPIO_BOP_BOP2;
+    }
+    else {
+        GPIO_BOP(GPIOB) = GPIO_BOP_CR2;
+    }
+        _LineState = LineState;
 }
-#endif
+
+void uUSBLIB_DataReceivedHandler(uint16_t *Data, uint16_t Length)
+{
+    /* NOTE: This function Should not be modified, when the callback is needed,
+       the uUSBLIB_DataReceivedHandler could be implemented in the user file
+    */
+}
