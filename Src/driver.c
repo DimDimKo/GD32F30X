@@ -1397,8 +1397,9 @@ bool driver_init (void)
     // Enable EEPROM and serial port here for grblHAL to be able to configure itself and report any errors
 
     hal.info = "GD32F303CC";
-    hal.driver_version = "250716";
-    hal.driver_url = GRBL_URL "/GD32F30x";
+    hal.driver_version = "260518";
+    //hal.driver_url = GRBL_URL "/GD32F30x";
+    hal.driver_url = "https://github.com/DimDimKo/GD32F30x";
 #ifdef BOARD_NAME
     hal.board = BOARD_NAME;
 #endif
@@ -1452,11 +1453,21 @@ bool driver_init (void)
     hal.periph_port.register_pin = registerPeriphPin;
     hal.periph_port.set_pin_description = setPeriphPinDescription;
 
+    serialRegisterStreams();
+#if USB_SERIAL_CDC
+    stream_connect(usbInit());
+#else
+    if(!stream_connect_instance(SERIAL_STREAM, BAUD_RATE))
+        while(true); // Cannot boot if no communication channel is available!
+#endif
+
+/*
 #if USB_SERIAL_CDC
     stream_connect(usbInit());
 #else
     stream_connect(serialInit(BAUD_RATE));
 #endif
+*/
 
 #if EEPROM_ENABLE
     i2c_eeprom_init();

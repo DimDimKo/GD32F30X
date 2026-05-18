@@ -42,7 +42,7 @@
 #include "driver_opts.h"
 
 #ifdef USB_SERIAL_CDC
-    #if !defined(CDC_TYPE_CMSIS) && !defined(CDC_TYPE_CH340)
+    #if !defined(CDC_TYPE_CH340) && !defined(CDC_TYPE_GD32) && !defined(CDC_TYPE_STM32)
         #define CDC_TYPE_STM32
     #endif
 #endif

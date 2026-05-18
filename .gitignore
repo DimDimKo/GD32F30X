@@ -4,4 +4,12 @@
 .vscode/launch.json
 .vscode/ipch
 .vscode/settings.json
-src/plugins.c
+Inc/stm32_def.h
+Inc/stm32f3xx_hal_def.h
+Inc/stm32f3xx_hal_pcd_ex.h
+Inc/stm32f3xx_hal_pcd.h
+Inc/stm32f3xx_ll_usb.h
+Src/plugins.c
+Src/stm32f3xx_hal_pcd_ex.c
+Src/stm32f3xx_hal_pcd.c
+Src/stm32f3xx_ll_usb.c

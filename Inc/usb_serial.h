@@ -37,5 +37,6 @@ extern volatile usb_linestate_t usb_linestate;
 
 const io_stream_t *usbInit (void);
 void usbBufferInput (uint8_t *data, uint32_t length);
+void ucdc_isr(void);
 
 /*EOF*/
