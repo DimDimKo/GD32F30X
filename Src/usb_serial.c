@@ -53,8 +53,7 @@ static bool is_connected (void)
 #ifdef CDC_TYPE_STM32
     return usb_linestate.pin.dtr && hal.get_elapsed_ticks() - usb_linestate.timestamp >= 15;
 #else
-    return true;
-    // TODO: change this function
+    return usb_linestate.pin.dtr && hal.get_elapsed_ticks() - usb_linestate.timestamp >= 15;
 #endif
 }
 
@@ -110,12 +109,10 @@ static bool usbPutC (const uint8_t c)
 {
     static uint8_t buf[1];
     *buf = c;
-
         while(usbserial_send(&usbd_cdc, buf, 1) == USBD_BUSY) {
             if(!hal.stream_blocking_callback())
                 return false;
         }
-
     return true;
 }
 
@@ -126,7 +123,6 @@ static bool usbPutC (const uint8_t c)
 static void usbWriteS (const char *s)
 {
     size_t length = strlen(s);
-
     if(length == 0)
         return;
     if(txbuf.length && (txbuf.length + length) > txbuf.max_length) {
@@ -244,13 +240,11 @@ static void gd32_cdc_init(void)
     /* enable the USB low priority interrupt */
     nvic_irq_enable((uint8_t)USBD_LP_CAN0_RX0_IRQn, 2U, 0U);
     usbd_connect(&usbd_cdc);
-    cdc_acm_data_receive(&usbd_cdc);
-    //USBD_EP_RX_STAT_SET(EP_ID(CDC_OUT_EP), EPRX_VALID);
 }
 
 // NOTE: USB interrupt priority should be set lower than stepper/step timer to avoid jitter
 // It is set in HAL_PCD_MspInit() in usbd_conf.c
-const io_stream_t *usbInit (void)
+const io_stream_t *usbInit (uint32_t baud_rate)
 {
     static const io_stream_t stream = {
         .type = StreamType_Serial,
@@ -279,11 +273,12 @@ const io_stream_t *usbInit (void)
 static uint8_t usbserial_send(usb_dev *udev, uint8_t* pBuf, uint16_t Len)
 {
     usb_cdc_handler *cdc = (usb_cdc_handler *)udev->class_data[CDC_COM_INTERFACE];
-
     if((Len != 0U) && (cdc->packet_sent == 1)) {
-        cdc->packet_sent = 0U;
-        usbd_ep_send(&usbd_cdc, CDC_IN_EP, pBuf, Len);
-        cdc->receive_length = 0U;
+        if (is_connected()) {
+            cdc->packet_sent = 0U;
+            usbd_ep_send(&usbd_cdc, CDC_IN_EP, pBuf, Len);
+            cdc->receive_length = 0U;
+        }
         return USBD_OK;
     } else {
         return USBD_BUSY;
@@ -341,25 +336,14 @@ void ucdc_isr(void)
                         uint32_t *read_addr = (uint32_t *)(btable_ep[ep_num].rx_addr * 2U + USBD_RAM);
                         if (bytes < (RX_BUFFER_SIZE - BUFCOUNT(rxbuf.head, rxbuf.tail, RX_BUFFER_SIZE))) {
                             // Read PMA to fifo
-                            
                             uint16_t read16;
                             for(uint16_t n = 0U; n < bytes / 2U; n++) {
                                 read16 = (uint16_t) * read_addr++;
-
-                                //rxbuf.data[rxbuf.head] = BYTE_LOW(read16);
-                                //rxbuf.head = BUFNEXT(rxbuf.head, rxbuf);
                                 WriteC2rxbuf(BYTE_LOW(read16));
-                                
-                                //rxbuf.data[rxbuf.head] = BYTE_HIGH(read16);
-                                //rxbuf.head = BUFNEXT(rxbuf.head, rxbuf);
                                 WriteC2rxbuf(BYTE_HIGH(read16));
-
                             }
                             if (bytes % 2) {
                                 read16 = (uint16_t) * read_addr++;
-                                
-                                //rxbuf.data[rxbuf.head] = BYTE_LOW(read16);
-                                //rxbuf.head = BUFNEXT(rxbuf.head, rxbuf);
                                 WriteC2rxbuf(BYTE_LOW(read16));
                             }
                             // cdc_acm_data_out
@@ -382,7 +366,6 @@ void ucdc_isr(void)
                         }
                     } else {
                         usbd_ep_send(udev, ep_num, transc->xfer_buf, transc->xfer_len);
-
                     }
                 }
             }
@@ -427,11 +410,9 @@ void ucdc_isr(void)
             if(0U == --udev->pm.esof_count) {
                 if(udev->pm.remote_wakeup_on) {
                     USBD_CTL &= ~CTL_RSREQ;
-
                     udev->pm.remote_wakeup_on = 0U;
                 } else {
                     USBD_CTL |= CTL_RSREQ;
-
                     udev->pm.esof_count = 3U;
                     udev->pm.remote_wakeup_on = 1U;
                 }

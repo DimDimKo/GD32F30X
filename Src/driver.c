@@ -1279,7 +1279,6 @@ static void enumeratePins (bool low_level, pin_info_ptr pin_info, void *data)
         pin.port = low_level ? ppin->pin.port : (void *)port2char(ppin->pin.port);
         pin.mode = ppin->pin.mode;
         pin.description = ppin->pin.description;
-
         pin_info(&pin, data);
     } while((ppin = ppin->next));
 }
@@ -1454,20 +1453,12 @@ bool driver_init (void)
     hal.periph_port.set_pin_description = setPeriphPinDescription;
 
     serialRegisterStreams();
+    stream_connect_instance(0,BAUD_RATE);
 #if USB_SERIAL_CDC
-    stream_connect(usbInit());
-#else
-    if(!stream_connect_instance(SERIAL_STREAM, BAUD_RATE))
-        while(true); // Cannot boot if no communication channel is available!
+    stream_connect_instance(1, BAUD_RATE);
+    
 #endif
 
-/*
-#if USB_SERIAL_CDC
-    stream_connect(usbInit());
-#else
-    stream_connect(serialInit(BAUD_RATE));
-#endif
-*/
 
 #if EEPROM_ENABLE
     i2c_eeprom_init();
@@ -1604,8 +1595,6 @@ bool driver_init (void)
 #ifdef HAS_BOARD_INIT
     board_init();
 #endif
-
-    serialRegisterStreams();
 
 #include "plugins_init.h"
 

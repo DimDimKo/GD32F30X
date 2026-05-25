@@ -35,8 +35,7 @@ typedef struct {
 
 extern volatile usb_linestate_t usb_linestate;
 
-const io_stream_t *usbInit (void);
-void usbBufferInput (uint8_t *data, uint32_t length);
+const io_stream_t *usbInit (uint32_t baud_rate);
 void ucdc_isr(void);
 
 /*EOF*/

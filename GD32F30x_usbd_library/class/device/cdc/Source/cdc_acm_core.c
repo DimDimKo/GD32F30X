@@ -32,6 +32,9 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 OF SUCH DAMAGE.
 */
 
+#include "driver.h"
+#include "usb_serial.h"
+
 #include "usbd_transc.h"
 #include "cdc_acm_core.h"
 
@@ -356,7 +359,8 @@ static uint8_t cdc_acm_init(usb_dev *udev, uint8_t config_index)
     cdc_handler.receive_length = 0U;
 
     cdc_handler.line_coding = (acm_line) {
-        .dwDTERate   = 115200U,
+        //.dwDTERate   = 115200U,
+        .dwDTERate   = 9600U,
         .bCharFormat = 0U,
         .bParityType = 0U,
         .bDataBits   = 0x08U
@@ -399,7 +403,6 @@ static uint8_t cdc_acm_ctlx_out(usb_dev *udev)
     if(NO_CMD != udev->class_core->req_cmd) {
         cdc->packet_receive = 1U;
         cdc->pre_packet_send = 1U;
-
         udev->class_core->req_cmd = NO_CMD;
     }
 
@@ -453,7 +456,6 @@ static uint8_t cdc_acm_req_handler(usb_dev *udev, usb_req *req)
 {
     uint8_t status = REQ_NOTSUPP, noti_buf[10] = {0U};
     usb_cdc_handler *cdc = (usb_cdc_handler *)udev->class_data[CDC_COM_INTERFACE];
-
     acm_notification *notif = (void *)noti_buf;
 
     switch(req->bRequest) {
@@ -475,9 +477,7 @@ static uint8_t cdc_acm_req_handler(usb_dev *udev, usb_req *req)
     case SET_LINE_CODING:
         /* set the value of the current command to be processed */
         udev->class_core->req_cmd = req->bRequest;
-
         usb_transc_config(&udev->transc_out[0], (uint8_t *)&cdc->line_coding, req->wLength, 0U);
-
         status = REQ_SUPP;
         break;
 
@@ -495,7 +495,19 @@ static uint8_t cdc_acm_req_handler(usb_dev *udev, usb_req *req)
         notif->wLength = 2U;
         noti_buf[8] = (uint8_t)req->wValue & 3U;
         noti_buf[9] = 0U;
+        /* grblHAL code*/
+        usb_linestate.pin.value = noti_buf[8];
+        usb_linestate.timestamp = hal.get_elapsed_ticks();
+        if(hal.stream.state.is_usb && hal.stream.on_linestate_changed)
+            hal.stream.on_linestate_changed(usb_linestate.pin);
+#ifdef BLUEPILL_LED
+        if (usb_linestate.pin.dtr)
+            gpio_bit_set(GPIOB, GPIO_PIN_2);
+        else
+            gpio_bit_reset(GPIOB, GPIO_PIN_2);
+#endif
 
+        /* End of grblHAL code*/
         status = REQ_SUPP;
         break;
 

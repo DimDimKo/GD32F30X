@@ -22,13 +22,13 @@
 */
 
 #include <string.h>
-
 #include "serial.h"
 #include "hal.h"
 #include "protocol.h"
-
 #include "main.h"
-
+#if USB_SERIAL_CDC
+#include "usb_serial.h"
+#endif
 #define USART_IRQHandler USART0_IRQHandler
 
 /* settings for used USART (UASRT0) and pins, TX = PA9, RX = PA10 */
@@ -53,6 +53,17 @@ static io_stream_properties_t serial[] = {
       .flags.can_set_baud = Off,
       .claim = serialInit
     }
+#if USB_SERIAL_CDC
+    ,
+    {
+        .type = StreamType_Serial,
+        .instance = 1,
+        .flags.claimable = On,
+        .flags.claimed = Off,
+        .flags.can_set_baud = Off,
+        .claim = usbInit
+    }
+#endif
 };
 
 void serialRegisterStreams (void)
@@ -80,8 +91,30 @@ void serialRegisterStreams (void)
         .description = "UART1"
     };
 
+#if USB_SERIAL_CDC
+    static const periph_pin_t usbdm = {
+        .function = Virtual_Pin,
+        .group = PinGroup_USB,
+        .port  = (void *)GPIOA,
+        .pin   = 11,
+        .mode  = { .mask = PINMODE_NONE },
+        .description = "USB_DM"
+    };
+    
+    static const periph_pin_t usbdp = {
+        .function = Virtual_Pin,
+        .group = PinGroup_USB,
+        .port  = (void *)GPIOA,
+        .pin   = 12,
+        .mode  = { .mask = PINMODE_NONE },
+        .description = "USB_DP"
+    };
+#endif
+
     hal.periph_port.register_pin(&rx0);
     hal.periph_port.register_pin(&tx0);
+    hal.periph_port.register_pin(&usbdp);
+    hal.periph_port.register_pin(&usbdm);
 
     stream_register_streams(&streams);
 }
