@@ -37,6 +37,7 @@
 #include "usbd_lld_core.h"
 #include "usbd_transc.h"
 #include "usbd_core.h"
+
 usb_dev usbd_cdc;
 
 #endif // CDC_TYPE_GD32
