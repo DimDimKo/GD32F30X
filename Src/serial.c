@@ -109,12 +109,14 @@ void serialRegisterStreams (void)
         .mode  = { .mask = PINMODE_NONE },
         .description = "USB_DP"
     };
+
+    hal.periph_port.register_pin(&usbdp);
+    hal.periph_port.register_pin(&usbdm);
+
 #endif
 
     hal.periph_port.register_pin(&rx0);
     hal.periph_port.register_pin(&tx0);
-    hal.periph_port.register_pin(&usbdp);
-    hal.periph_port.register_pin(&usbdm);
 
     stream_register_streams(&streams);
 }
