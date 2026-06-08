@@ -29,18 +29,13 @@
 
 #if USB_SERIAL_CDC
 
-#ifdef CDC_TYPE_GD32
-
 #include "cdc_acm_core.h"
 #include "usbd_lld_regs.h"
 #include "usbd_lld_int.h"
 #include "usbd_lld_core.h"
 #include "usbd_transc.h"
 #include "usbd_core.h"
-
 usb_dev usbd_cdc;
-
-#endif // CDC_TYPE_GD32
 
 static stream_rx_buffer_t rxbuf = {0};
 static stream_block_tx_buffer2_t txbuf = {0};

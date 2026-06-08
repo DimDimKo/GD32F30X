@@ -37,6 +37,7 @@ OF SUCH DAMAGE.
 
 #include "usbd_transc.h"
 #include "cdc_acm_core.h"
+#include "state_machine.h"
 
 #include <stdio.h>
 
@@ -501,12 +502,14 @@ static uint8_t cdc_acm_req_handler(usb_dev *udev, usb_req *req)
         if(hal.stream.state.is_usb && hal.stream.on_linestate_changed)
             hal.stream.on_linestate_changed(usb_linestate.pin);
 #ifdef BLUEPILL_LED
-        if (usb_linestate.pin.dtr)
-            gpio_bit_set(GPIOB, GPIO_PIN_2);
-        else
-            gpio_bit_reset(GPIOB, GPIO_PIN_2);
+        if ((usb_linestate.pin.dtr) && (state_get() == STATE_IDLE)) {
+            // TODO: Switch stream to USB-CDC
+            gpio_bit_set(GPIOB, GPIO_PIN_2); // VCP is open
+        } else {
+            // TODO: Switch stream to UART
+            gpio_bit_reset(GPIOB, GPIO_PIN_2); // Closing VCP
+        }
 #endif
-
         /* End of grblHAL code*/
         status = REQ_SUPP;
         break;
