@@ -135,9 +135,7 @@ void PendSV_Handler(void)
 #if USB_SERIAL_CDC
 void USBD_LP_CAN0_RX0_IRQHandler (void)
 {
-#ifdef CDC_TYPE_GD32
     ucdc_isr();
-#endif
 }
 #endif
 
