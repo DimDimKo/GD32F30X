@@ -1453,7 +1453,7 @@ bool driver_init (void)
     hal.periph_port.set_pin_description = setPeriphPinDescription;
 
     serialRegisterStreams();
-    stream_connect_instance(0,BAUD_RATE);
+    stream_connect_instance(0, BAUD_RATE);
 #if USB_SERIAL_CDC
     stream_connect_instance(1, BAUD_RATE);
 #endif

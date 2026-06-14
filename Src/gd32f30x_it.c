@@ -34,7 +34,7 @@ OF SUCH DAMAGE.
 
 #include "gd32f30x_it.h"
 #include "driver.h"
-#ifdef CDC_TYPE_GD32
+#if USB_SERIAL_CDC
 #include "usb_serial.h"
 #endif
 
