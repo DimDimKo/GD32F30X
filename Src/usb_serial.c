@@ -31,10 +31,10 @@
 
 #include "cdc_acm_core.h"
 #include "usbd_lld_regs.h"
-#include "usbd_lld_int.h"
 #include "usbd_lld_core.h"
 #include "usbd_transc.h"
 #include "usbd_core.h"
+#include "usbd_pwr.h"
 usb_dev usbd_cdc;
 
 static stream_rx_buffer_t rxbuf = {0};
@@ -42,6 +42,10 @@ static stream_block_tx_buffer2_t txbuf = {0};
 static enqueue_realtime_command_ptr enqueue_realtime_command = protocol_enqueue_realtime_command;
 volatile usb_linestate_t usb_linestate = {0};
 
+/* local function prototypes ('static') */
+#ifdef LPM_ENABLED
+static void usbd_int_suspend(usb_dev *udev);
+#endif
 static uint8_t usbserial_send(usb_dev *udev, uint8_t* pBuf, uint16_t Len);
 
 static bool is_connected (void)
@@ -422,6 +426,43 @@ void ucdc_isr(void)
         udev->drv_handler->ep_reset(udev);
         //usbd_ep_reset(udev);
     }
+#ifdef LPM_ENABLED
+    if(INTF_L1REQ & int_flag) {
+        /* clear L1 ST bit in LPM INTF */
+        USBD_INTF = CLR(L1REQ);
+        /* read BESL field from subendpoint0 register which corresponds to HIRD parameter in LPM spec */
+        udev->lpm.besl = (USBD_LPMCS & LPMCS_BLSTAT) >> 4U;
+        /* read BREMOTEWAKE bit from subendpoint0 register which corresponding to bRemoteWake bit in LPM request */
+        udev->lpm.L1_remote_wakeup = (USBD_LPMCS & LPMCS_REMWK) >> 3;
+        /* process USB device core layer suspend routine */
+        usbd_int_suspend(udev);
+    }
+#endif /* LPM_ENABLED */
 }
+
+#ifdef LPM_ENABLED
+/*!
+    \brief      handle USB suspend event
+    \param[in]  udev: pointer to USB device instance
+    \param[out] none
+    \retval     none
+*/
+static void usbd_int_suspend(usb_dev *udev)
+{
+    /* store the device current status */
+    udev->backup_status = udev->cur_status;
+
+    /* set device in suspended state */
+    udev->cur_status = (uint8_t)USBD_SUSPENDED;
+
+    /* USB enter in suspend mode and MCU system in low power mode */
+    if(udev->pm.suspend_enabled) {
+        usbd_to_suspend(udev);
+    } else {
+        /* if not possible then resume after xx ms */
+        udev->pm.esof_count = 3U;
+    }
+}
+#endif /* LPM_ENABLED */
 
 #endif // USB_SERIAL_CDC
