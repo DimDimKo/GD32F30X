@@ -499,8 +499,7 @@ static uint8_t cdc_acm_req_handler(usb_dev *udev, usb_req *req)
         /* grblHAL code*/
         usb_linestate.pin.value = noti_buf[8];
         usb_linestate.timestamp = hal.get_elapsed_ticks();
-        if(hal.stream.state.is_usb && hal.stream.on_linestate_changed)
-            hal.stream.on_linestate_changed(usb_linestate.pin);
+        stream_usb_linestate_changed(1, usb_linestate.pin);
 #ifdef BLUEPILL_LED
         if ((usb_linestate.pin.dtr) && (state_get() == STATE_IDLE)) {
             // TODO: Switch stream to USB-CDC
