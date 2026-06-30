@@ -41,12 +41,6 @@
 #include "nuts_bolts.h"
 #include "driver_opts.h"
 
-#ifdef USB_SERIAL_CDC
-    #if !defined(CDC_TYPE_CH340) && !defined(CDC_TYPE_GD32) && !defined(CDC_TYPE_STM32)
-        #define CDC_TYPE_STM32
-    #endif
-#endif
-
 #define DIGITAL_IN(gpio_periph, pin) !!(GPIO_ISTAT(gpio_periph)&(pin))
 #define DIGITAL_OUT(gpio_periph, pin, on) { if(on) GPIO_BOP(gpio_periph) = (uint32_t)pin; else GPIO_BC(gpio_periph) = (uint32_t)pin; }
 

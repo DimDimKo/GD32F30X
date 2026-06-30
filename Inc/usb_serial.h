@@ -34,6 +34,7 @@ typedef struct {
 } usb_linestate_t;
 
 extern volatile usb_linestate_t usb_linestate;
+extern io_stream_properties_t serial[];
 
 const io_stream_t *usbInit (uint32_t baud_rate);
 void ucdc_isr(void);

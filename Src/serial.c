@@ -44,7 +44,7 @@ static stream_rx_buffer_t rxbuf = {0};
 static stream_tx_buffer_t txbuf = {0};
 static enqueue_realtime_command_ptr enqueue_realtime_command = protocol_enqueue_realtime_command;
 
-static io_stream_properties_t serial[] = {
+/*static*/ io_stream_properties_t serial[] = {
     {
       .type = StreamType_Serial,
       .instance = 0,
@@ -229,7 +229,7 @@ const io_stream_t *serialInit (uint32_t baud_rate)
         .set_enqueue_rt_handler = serialSetRtHandler
     };
 
-    if(serial[0].flags.claimed || baud_rate != 115200)
+    if(serial[0].flags.claimed || baud_rate != BAUD_RATE)
         return NULL;
 
     serial[0].flags.claimed = On;

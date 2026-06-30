@@ -50,11 +50,7 @@ static uint8_t usbserial_send(usb_dev *udev, uint8_t* pBuf, uint16_t Len);
 
 static bool is_connected (void)
 {
-#ifdef CDC_TYPE_STM32
     return usb_linestate.pin.dtr && hal.get_elapsed_ticks() - usb_linestate.timestamp >= 15;
-#else
-    return usb_linestate.pin.dtr && hal.get_elapsed_ticks() - usb_linestate.timestamp >= 15;
-#endif
 }
 
 //
@@ -243,7 +239,7 @@ static void gd32_cdc_init(void)
 }
 
 // NOTE: USB interrupt priority should be set lower than stepper/step timer to avoid jitter
-// It is set in HAL_PCD_MspInit() in usbd_conf.c
+
 const io_stream_t *usbInit (uint32_t baud_rate)
 {
     static const io_stream_t stream = {
@@ -264,6 +260,10 @@ const io_stream_t *usbInit (uint32_t baud_rate)
     };
 
     gd32_cdc_init();
+
+    if(serial[1].flags.claimed || baud_rate != BAUD_RATE)
+        return NULL;
+    serial[1].flags.claimed = On;
 
     txbuf.s = txbuf.data;
     txbuf.max_length = BLOCK_TX_BUFFER_SIZE;
